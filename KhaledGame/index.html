@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exercício do Robo</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style> body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; } </style>
+</head>
+<body>
+    <script>
+       const larguraJogo = window.innerWidth;
+const alturaJogo = window.innerHeight;
+
+// Configuração do jogo com Phaser
+const config = {
+    type: Phaser.AUTO,
+    width: larguraJogo,
+    height: alturaJogo,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 300 },
+            debug: false
+        },
+    },
+    scene: { preload, create, update }
+};
+
+const game = new Phaser.Game(config);
+
+// Variáveis globais
+let robo, teclado, fogo, plataformas, barrels, placar, pontuacao, nomeJogador, textoInicio, iniciou = false;
+let dino, textoNomeJogador;
+
+// Função para carregar os assets do jogo
+function preload() {
+    this.load.image('background', 'assets/fundo.png');
+    this.load.image('player', 'assets/robo.png');
+    this.load.image('turbo_nave', 'assets/turbo.png');
+    this.load.image('plataforma_Transporter', 'assets/Transporter.png');
+    this.load.image('barrel', 'assets/barrel1.png');
+    this.load.image('dino', 'assets/dino.png');
+}
+
+// Função para criar os objetos na tela
+function create() {
+    this.add.image(larguraJogo / 2, alturaJogo / 2, 'background').setDisplaySize(larguraJogo, alturaJogo);
+
+    // Tela de introdução
+    textoInicio = this.add.text(larguraJogo / 2 - 200, alturaJogo / 2 - 50, 'Digite seu nome e pressione ENTER', {
+        fontSize: '30px',
+        fill: '#ffffff'
+    });
+
+    nomeJogador = '';
+    this.input.keyboard.on('keydown', (event) => {
+        if (!iniciou) {
+            if (event.key === 'Enter' && nomeJogador.length > 0) {
+                textoInicio.destroy();
+                iniciarJogo.call(this);
+            } else if (event.key.length === 1) {
+                nomeJogador += event.key;
+                textoInicio.setText('Nome: ' + nomeJogador);
+            }
+        }
+    });
+}
+
+function iniciarJogo() {
+    iniciou = true;
+
+    fogo = this.add.sprite(0, 0, 'turbo_nave').setVisible(false);
+
+    // Criando o robô na plataforma à esquerda
+    robo = this.physics.add.sprite(larguraJogo / 5, alturaJogo - 150, 'player') // Alterado para spawnar na plataforma da esquerda
+        .setScale(0.2)
+        .setCollideWorldBounds(true);
+    robo.body.setSize(robo.width * 0.5, robo.height * 0.8, true);
+    robo.body.offset.y = 10;
+
+    teclado = this.input.keyboard.createCursorKeys();
+
+    // Criando as plataformas
+    plataformas = this.physics.add.staticGroup();
+    
+    // Plataforma inferior (Transporter inferior)
+    plataformas.create(larguraJogo / 2, alturaJogo - 100, 'plataforma_Transporter')
+        .setScale(3, 1)
+        .refreshBody();
+    
+    // Plataforma média centralizada
+    plataformas.create(larguraJogo / 2, alturaJogo / 2 - 50, 'plataforma_Transporter')
+        .setScale(1, 1)
+        .refreshBody();
+    
+    // Plataforma direita
+    plataformas.create(larguraJogo * 4 / 5, alturaJogo / 2 - 50, 'plataforma_Transporter')
+        .setScale(1, 1)
+        .refreshBody();
+    
+    // Plataforma superior à direita
+    plataformas.create(larguraJogo * 4 / 5, alturaJogo / 3, 'plataforma_Transporter')
+        .setScale(1, 1)
+        .refreshBody();
+
+    // Plataforma pequena à esquerda
+    plataformas.create(larguraJogo / 5, alturaJogo / 3, 'plataforma_Transporter')
+        .setScale(0.5, 1)
+        .refreshBody();
+
+    this.physics.add.collider(robo, plataformas);
+
+    // Criando os barris
+    barrels = this.physics.add.group();
+    this.time.addEvent({ delay: 2000, callback: spawnBarrel, callbackScope: this, loop: true });
+    
+    this.physics.add.collider(barrels, plataformas);
+    this.physics.add.collider(barrels, robo, coletarBarrel, null, this);
+
+    // Criando o placar
+    pontuacao = 0;
+    placar = this.add.text(50, 50, 'Barrels: ' + pontuacao, { fontSize: '45px', fill: '#495613' });
+
+    // Exibindo o nome do jogador na parte superior
+    textoNomeJogador = this.add.text(larguraJogo / 2 - 150, 20, 'Jogador: ' + nomeJogador, {
+        fontSize: '20px',
+        fill: '#ffffff'
+    });
+
+    // Criando o Dino na plataforma inferior (Transporter inferior)
+    dino = this.physics.add.sprite(larguraJogo / 2, alturaJogo - 100, 'dino')
+        .setScale(0.3)  // Reduzindo o tamanho do Dino
+        .setCollideWorldBounds(true);
+    dino.body.setSize(dino.width * 0.6, dino.height * 0.6); // Diminuindo o hitbox do Dino
+    dino.direction = 'left'; // Direção inicial do Dino
+    this.physics.add.collider(dino, plataformas);
+    this.physics.add.collider(robo, dino, gameOver, null, this); // Verificando colisão entre o robô e o Dino
+}
+
+// Função para coletar barris
+function coletarBarrel(robo, barrel) {
+    barrel.disableBody(true, true);
+    pontuacao++;
+    placar.setText('Barrels: ' + pontuacao);
+}
+
+// Função para spawnar barris caindo do topo
+function spawnBarrel() {
+    let newBarrel = barrels.create(
+        Phaser.Math.Between(50, larguraJogo - 50),
+        0, 
+        'barrel'
+    );
+    newBarrel.setBounce(0.5);
+    newBarrel.setCollideWorldBounds(true);
+    newBarrel.setVelocityY(Phaser.Math.Between(100, 200));
+}
+
+// Função de atualização contínua do jogo
+// Função de atualização contínua do jogo
+function update() {
+    if (!iniciou) return;
+
+    robo.setVelocity(0);
+    
+    // Movimentação do robô
+    if (teclado.left.isDown) {
+        robo.setVelocityX(-150);
+        robo.setFlipX(true);
+    } else if (teclado.right.isDown) {
+        robo.setVelocityX(150);
+        robo.setFlipX(false);
+    }
+    
+    if (teclado.up.isDown) {
+        robo.setVelocityY(-150);
+        fogo.setVisible(true);
+    } else {
+        fogo.setVisible(false);
+        if (!robo.body.touching.down) {
+            robo.setVelocityY(150); // Faz o robô cair caso não esteja em uma plataforma
+        }
+    }
+    
+    // Ajustando a posição do efeito de fogo
+    fogo.setPosition(robo.x, robo.y + robo.displayHeight / 2);
+
+    // Movimentação do Dino (indo e voltando infinitamente)
+    if (dino.direction === 'left') {
+        dino.setVelocityX(-100);
+        dino.setFlipX(true);  // Espelha o Dino quando ele vai para a esquerda
+    } else if (dino.direction === 'right') {
+        dino.setVelocityX(100);
+        dino.setFlipX(false); // Desespelha o Dino quando ele vai para a direita
+    }
+
+    // Troca de direção do Dino ao atingir as bordas da plataforma
+    if (dino.x <= larguraJogo / 5) {
+        dino.direction = 'right';
+    } else if (dino.x >= larguraJogo * 4 / 5) {
+        dino.direction = 'left';
+    }
+
+    // Adicionando um loop for que percorre todos os barris e verifica se algum tocou o fundo
+    // A funcionalidade do jogo não muda, apenas usamos o loop for para realizar a verificação
+    for (let i = 0; i < barrels.getChildren().length; i++) {
+        let barrel = barrels.getChildren()[i];
+        if (barrel.y > alturaJogo) {
+            barrel.setPosition(Phaser.Math.Between(50, larguraJogo - 50), 0);  // Reposiciona o barril no topo
+        }
+    }
+}
+
+
+// Função para o Game Over
+function gameOver(robo, dino) {
+    // Evitar crash e reiniciar o jogo corretamente
+    robo.setVelocity(0);
+    dino.setVelocity(0); // Parar o Dino
+    this.time.delayedCall(500, () => {
+        this.scene.restart(); // Reinicia a cena após o Game Over
+    });
+}
+
+
+
+
+function resetarPosicaoRobo() {
+    robo.setPosition(larguraJogo / 2, 700);
+}
+
+
+    </script>
+</body>
+</html>
