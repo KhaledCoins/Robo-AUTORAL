@@ -14,85 +14,29 @@
             margin: 0; 
             background-color: #222;
         } 
-        
-        #game-container {
-            position: relative;
-            touch-action: none;
-        }
-        
-        /* Estilos para controles mobile */
-        #mobile-controls {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: none;
-            width: 100%;
-            max-width: 300px;
-            z-index: 10;
-        }
-        
-        .control-button {
-            background-color: rgba(52, 152, 219, 0.6);
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            color: white;
-            width: 70px;
-            height: 70px;
-            font-size: 24px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-        
-        #left-right-controls {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-        }
-        
-        #jump-button {
-            position: absolute;
-            bottom: 0;
-            right: 20px;
-        }
     </style>
 </head>
 <body>
-    <div id="game-container">
-        <!-- Mobile controls -->
-        <div id="mobile-controls">
-            <div id="left-right-controls">
-                <div id="left-button" class="control-button">←</div>
-                <div id="right-button" class="control-button">→</div>
-            </div>
-            <div id="jump-button" class="control-button">↑</div>
-        </div>
-    </div>
-    
     <script>
-// Detecção de dispositivo
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const larguraJogo = window.innerWidth;
+const alturaJogo = window.innerHeight;
 
-// Ajustar tamanhos com base no dispositivo
-let larguraJogo, alturaJogo;
-
-if (isMobile) {
-    larguraJogo = window.innerWidth;
-    alturaJogo = window.innerHeight;
-} else {
-    larguraJogo = Math.min(window.innerWidth, 1024);
-    alturaJogo = Math.min(window.innerHeight, 768);
+// Função para detectar se o dispositivo é móvel
+function isMobileDevice() {
+    return (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 800 && window.innerHeight <= 800)
+    );
 }
+
+// Variável global para armazenar se é dispositivo móvel
+const isMobile = isMobileDevice();
 
 // Configuração do jogo com Phaser
 const config = {
     type: Phaser.AUTO,
     width: larguraJogo,
     height: alturaJogo,
-    parent: 'game-container',
     physics: {
         default: 'arcade',
         arcade: {
@@ -106,20 +50,13 @@ const config = {
 const game = new Phaser.Game(config);
 
 // Variáveis globais
-let robo, teclado, fogo, plataformas, plataformasMoveis, barrels, placar, pontuacao, nomeJogador, iniciou = false;
+let robo, teclado, fogo, plataformas, barrels, placar, pontuacao, nomeJogador, iniciou = false;
 let dino, dinoGroup, textoNomeJogador, gameOverActive = false;
 let containerInicio, textoInicio, textoInstrucao, inputBg, cursorNome;
 let faseAtual = 1;
 let textoFase;
 let tempoUltimoPulo = 0; // Para controlar o pulo dos dinossauros
 let barrilNecessarioFase2 = 10; // Número de barris necessários para passar para a fase 2
-
-// Variáveis para controles mobile
-let touchControls = {
-    left: false,
-    right: false,
-    up: false
-};
 
 // Função para carregar os assets do jogo
 function preload() {
@@ -137,22 +74,17 @@ function preload() {
 function create() {
     // Adiciona o fundo
     this.add.image(larguraJogo / 2, alturaJogo / 2, 'background').setDisplaySize(larguraJogo, alturaJogo);
-    
+
     // Reseta as variáveis globais no início e quando reiniciar
     gameOverActive = false;
     nomeJogador = '';
     iniciou = false;
     faseAtual = 1;
     pontuacao = 0;
-    
+
     // Cria a tela de introdução mais atraente
     criarTelaInicial.call(this);
-    
-    // Configurar controles mobile se necessário
-    if (isMobile) {
-        configurarControlesMobile();
-    }
-    
+
     // Configura o evento de teclado para o nome do jogador
     this.input.keyboard.on('keydown', (event) => {
         if (!iniciou) {
@@ -168,105 +100,6 @@ function create() {
             }
         }
     });
-    
-    // Para dispositivos móveis, adicionar um botão "JOGAR" na tela inicial
-    if (isMobile && !iniciou) {
-        this.time.delayedCall(500, () => {
-            const startButton = this.add.rectangle(larguraJogo / 2, alturaJogo / 2 + 150, 200, 60, 0x3498db)
-                .setInteractive()
-                .on('pointerdown', () => {
-                    if (nomeJogador.length > 0) {
-                        containerInicio.destroy();
-                        iniciarJogo.call(this);
-                    } else {
-                        // Se o nome estiver vazio, colocar um nome padrão
-                        nomeJogador = 'Jogador';
-                        atualizarTextoNome.call(this);
-                        containerInicio.destroy();
-                        iniciarJogo.call(this);
-                    }
-                });
-            
-            const startText = this.add.text(larguraJogo / 2, alturaJogo / 2 + 150, 'JOGAR', {
-                fontSize: '24px',
-                fontFamily: 'Arial',
-                fill: '#ffffff'
-            }).setOrigin(0.5);
-            
-            containerInicio.add(startButton);
-            containerInicio.add(startText);
-        });
-    }
-    
-    // Adicionar evento para redimensionamento da janela
-    window.addEventListener('resize', () => {
-        if (!game) return;
-        
-        // Atualizar dimensões
-        if (isMobile) {
-            larguraJogo = window.innerWidth;
-            alturaJogo = window.innerHeight;
-        } else {
-            larguraJogo = Math.min(window.innerWidth, 1024);
-            alturaJogo = Math.min(window.innerHeight, 768);
-        }
-        
-        // Redimensionar o jogo
-        game.scale.resize(larguraJogo, alturaJogo);
-        
-        // Reposicionar elementos na tela quando necessário
-        if (containerInicio) {
-            containerInicio.setPosition(larguraJogo / 2, alturaJogo / 2);
-        }
-        
-        // Reposicionar controles móveis
-        if (isMobile) {
-            atualizarPosicaoControlesMobile();
-        }
-    });
-}
-
-// Função para configurar controles mobile
-function configurarControlesMobile() {
-    // Mostrar controles mobile
-    document.getElementById('mobile-controls').style.display = 'block';
-    
-    // Configurar botões de controle
-    const leftButton = document.getElementById('left-button');
-    const rightButton = document.getElementById('right-button');
-    const jumpButton = document.getElementById('jump-button');
-    
-    // Eventos de toque para o botão esquerdo
-    leftButton.addEventListener('touchstart', () => { touchControls.left = true; });
-    leftButton.addEventListener('touchend', () => { touchControls.left = false; });
-    leftButton.addEventListener('touchcancel', () => { touchControls.left = false; });
-    
-    // Eventos de toque para o botão direito
-    rightButton.addEventListener('touchstart', () => { touchControls.right = true; });
-    rightButton.addEventListener('touchend', () => { touchControls.right = false; });
-    rightButton.addEventListener('touchcancel', () => { touchControls.right = false; });
-    
-    // Eventos de toque para o botão de pulo
-    jumpButton.addEventListener('touchstart', () => { touchControls.up = true; });
-    jumpButton.addEventListener('touchend', () => { touchControls.up = false; });
-    jumpButton.addEventListener('touchcancel', () => { touchControls.up = false; });
-    
-    // Posicionar os controles corretamente
-    atualizarPosicaoControlesMobile();
-}
-
-// Atualizar posição dos controles mobile quando a tela é redimensionada
-function atualizarPosicaoControlesMobile() {
-    const controls = document.getElementById('mobile-controls');
-    if (controls) {
-        controls.style.bottom = '20px';
-    }
-    
-    const jumpButton = document.getElementById('jump-button');
-    if (jumpButton) {
-        jumpButton.style.bottom = '0';
-        jumpButton.style.right = '20px';
-    }
 }
 
 // Função para criar uma tela inicial mais atraente
@@ -278,12 +111,14 @@ function criarTelaInicial() {
         .setStrokeStyle(2, 0x3498db);
     containerInicio.add(painelBg);
     
-    // Título do jogo
+    // Título do jogo (use cor branca para mobile)
+    let tituloColor = isMobile ? '#ffffff' : '#3498db';
+    
     let titulo = this.add.text(0, -100, 'ROBÔ AVENTUREIRO', {
         fontSize: '36px',
         fontFamily: 'Arial',
         fontWeight: 'bold',
-        fill: '#3498db'
+        fill: tituloColor
     }).setOrigin(0.5);
     containerInicio.add(titulo);
     
@@ -334,40 +169,35 @@ function criarTelaInicial() {
         loop: true
     });
     
-    // Instruções para iniciar o jogo
-    if (isMobile) {
-        textoInstrucao = this.add.text(0, 60, 'Toque no botão JOGAR para iniciar', {
-            fontSize: '20px',
-            fontFamily: 'Arial',
-            fill: '#3498db'
-        }).setOrigin(0.5);
-    } else {
-        textoInstrucao = this.add.text(0, 60, 'Pressione ENTER para iniciar', {
-            fontSize: '20px',
-            fontFamily: 'Arial',
-            fill: '#3498db'
-        }).setOrigin(0.5);
-    }
+    // Instruções para iniciar o jogo (use cor branca para mobile)
+    let instrucaoColor = isMobile ? '#ffffff' : '#3498db';
+    
+    textoInstrucao = this.add.text(0, 60, 'Pressione ENTER para iniciar', {
+        fontSize: '20px',
+        fontFamily: 'Arial',
+        fill: instrucaoColor
+    }).setOrigin(0.5);
     containerInicio.add(textoInstrucao);
     
     // Instruções de jogo
-    let instrucoes;
-    if (isMobile) {
-        instrucoes = this.add.text(0, 120, 'Use os botões na tela para mover o robô\nColete 10 barris para avançar para a fase 2!', {
-            fontSize: '16px',
-            fontFamily: 'Arial',
-            fill: '#ffffff',
-            align: 'center'
-        }).setOrigin(0.5);
-    } else {
-        instrucoes = this.add.text(0, 120, 'Use as setas do teclado para mover o robô\nColete 10 barris para avançar para a fase 2!', {
-            fontSize: '16px',
-            fontFamily: 'Arial',
-            fill: '#ffffff',
-            align: 'center'
-        }).setOrigin(0.5);
-    }
+    let instrucoes = this.add.text(0, 120, 'Use as setas do teclado para mover o robô\nColete 10 barris para avançar para a fase 2!', {
+        fontSize: '16px',
+        fontFamily: 'Arial',
+        fill: '#ffffff',
+        align: 'center'
+    }).setOrigin(0.5);
     containerInicio.add(instrucoes);
+    
+    // Se for mobile, adiciona uma mensagem sobre controles touch
+    if (isMobile) {
+        let touchMsg = this.add.text(0, 160, 'Versão mobile detectada!', {
+            fontSize: '14px',
+            fontFamily: 'Arial',
+            fill: '#ffffff',
+            align: 'center'
+        }).setOrigin(0.5);
+        containerInicio.add(touchMsg);
+    }
 }
 
 // Função para atualizar o texto do nome
@@ -380,6 +210,7 @@ function iniciarJogo() {
     iniciou = true;
     faseAtual = 1;
     pontuacao = 0;
+
     criarFase1.call(this);
 }
 
@@ -389,122 +220,53 @@ function criarFase1() {
     mostrarMensagemFase.call(this, 1);
     
     fogo = this.add.sprite(0, 0, 'turbo_nave').setVisible(false);
-    
-    // Criando o robô numa posição segura no centro superior da tela
-    // Alterado para evitar que fique preso entre plataformas
-    robo = this.physics.add.sprite(larguraJogo / 2, 100, 'player') 
+
+    // Criando o robô na plataforma à esquerda
+    robo = this.physics.add.sprite(larguraJogo / 5, alturaJogo - 150, 'player') 
         .setScale(0.2)
         .setCollideWorldBounds(true);
     robo.body.setSize(robo.width * 0.5, robo.height * 0.8, true);
     robo.body.offset.y = 10;
-    
+
     teclado = this.input.keyboard.createCursorKeys();
-    
-    // Criando as plataformas estáticas
+
+    // Criando as plataformas
     plataformas = this.physics.add.staticGroup();
     
     // Plataforma inferior (Transporter inferior)
     plataformas.create(larguraJogo / 2, alturaJogo - 100, 'plataforma_Transporter')
         .setScale(3, 1)
-        .refreshBody()
-        .setData('tipo', 'estatica');
+        .refreshBody();
+    
+    // Plataforma média centralizada
+    plataformas.create(larguraJogo / 2, alturaJogo / 2 - 50, 'plataforma_Transporter')
+        .setScale(1, 1)
+        .refreshBody();
+    
+    // Plataforma direita
+    plataformas.create(larguraJogo * 4 / 5, alturaJogo / 2 - 50, 'plataforma_Transporter')
+        .setScale(1, 1)
+        .refreshBody();
     
     // Plataforma superior à direita
     plataformas.create(larguraJogo * 4 / 5, alturaJogo / 3, 'plataforma_Transporter')
         .setScale(1, 1)
-        .refreshBody()
-        .setData('tipo', 'estatica');
-    
+        .refreshBody();
+
     // Plataforma pequena à esquerda
     plataformas.create(larguraJogo / 5, alturaJogo / 3, 'plataforma_Transporter')
         .setScale(0.5, 1)
-        .refreshBody()
-        .setData('tipo', 'estatica');
-    
-    // Criar plataformas móveis
-    plataformasMoveis = this.physics.add.group();
-    
-    // Plataforma móvel horizontal (central)
-    let plataformaMovelH = plataformasMoveis.create(larguraJogo / 2, alturaJogo / 2 - 50, 'plataforma_Transporter')
-        .setScale(1, 1)
-        .setImmovable(true)
-        .setData('tipo', 'movel_horizontal');
-    
-    // Configurar movimento horizontal
-    this.tweens.add({
-        targets: plataformaMovelH,
-        x: larguraJogo / 2 + 200,
-        duration: 4000,
-        ease: 'Sine.easeInOut',
-        yoyo: true,
-        repeat: -1
-    });
-    
-    // Plataforma móvel vertical (direita)
-    let plataformaMovelV = plataformasMoveis.create(larguraJogo * 4 / 5, alturaJogo / 2 - 50, 'plataforma_Transporter')
-        .setScale(1, 1)
-        .setImmovable(true)
-        .setData('tipo', 'movel_vertical');
-    
-    // Configurar movimento vertical
-    this.tweens.add({
-        targets: plataformaMovelV,
-        y: alturaJogo / 2 + 150,
-        duration: 3000,
-        ease: 'Sine.easeInOut',
-        yoyo: true,
-        repeat: -1
-    });
-    
-    // Plataforma que se move em círculo
-    let plataformaCircular = plataformasMoveis.create(larguraJogo / 4, alturaJogo / 2, 'plataforma_Transporter')
-        .setScale(0.7, 1)
-        .setImmovable(true)
-        .setData('tipo', 'movel_circular');
-    
-    // Configurar movimento circular
-    this.tweens.timeline({
-        targets: plataformaCircular,
-        loop: -1,
-        tweens: [
-            {
-                x: larguraJogo / 4 + 100,
-                y: alturaJogo / 2 - 100,
-                duration: 1500,
-                ease: 'Sine.easeInOut'
-            },
-            {
-                x: larguraJogo / 4 + 200,
-                y: alturaJogo / 2,
-                duration: 1500,
-                ease: 'Sine.easeInOut'
-            },
-            {
-                x: larguraJogo / 4 + 100,
-                y: alturaJogo / 2 + 100,
-                duration: 1500,
-                ease: 'Sine.easeInOut'
-            },
-            {
-                x: larguraJogo / 4,
-                y: alturaJogo / 2,
-                duration: 1500,
-                ease: 'Sine.easeInOut'
-            }
-        ]
-    });
-    
+        .refreshBody();
+
     this.physics.add.collider(robo, plataformas);
-    this.physics.add.collider(robo, plataformasMoveis);
-    
+
     // Criando os barris
     barrels = this.physics.add.group();
     this.time.addEvent({ delay: 2000, callback: spawnBarrel, callbackScope: this, loop: true });
     
     this.physics.add.collider(barrels, plataformas);
-    this.physics.add.collider(barrels, plataformasMoveis);
     this.physics.add.collider(barrels, robo, coletarBarril, null, this);
-    
+
     // Criando o placar
     pontuacao = 0;
     placar = this.add.text(50, 50, 'Barris: ' + pontuacao + '/' + barrilNecessarioFase2, { 
@@ -514,7 +276,7 @@ function criarFase1() {
         strokeThickness: 4,
         fontFamily: 'Arial'
     });
-    
+
     // Exibindo o nome do jogador na parte superior
     textoNomeJogador = this.add.text(larguraJogo - 50, 50, 'Jogador: ' + nomeJogador, {
         fontSize: '22px',
@@ -523,7 +285,7 @@ function criarFase1() {
         strokeThickness: 3,
         fontFamily: 'Arial'
     }).setOrigin(1, 0);
-    
+
     // Criando o Dino na plataforma inferior 
     dino = this.physics.add.sprite(larguraJogo / 2, alturaJogo - 150, 'dino')
         .setScale(0.7)
@@ -531,7 +293,6 @@ function criarFase1() {
     dino.body.setSize(dino.width * 0.1, dino.height * 0.4);
     dino.direction = 'left';
     this.physics.add.collider(dino, plataformas);
-    this.physics.add.collider(dino, plataformasMoveis);
     this.physics.add.collider(robo, dino, gameOver, null, this);
     
     // Adicionando texto da fase atual
@@ -559,7 +320,6 @@ function criarFase2() {
     // Limpar objetos da fase 1
     if (dino) dino.destroy();
     if (plataformas) plataformas.clear(true, true);
-    if (plataformasMoveis) plataformasMoveis.clear(true, true);
     if (barrels) barrels.clear(true, true);
     
     // Reposicionar o robô
@@ -762,53 +522,31 @@ function fazerDinosPularem(time) {
 // Função de atualização contínua do jogo
 function update(time) {
     if (!iniciou || gameOverActive) return;
-    
+
     robo.setVelocity(0);
     
-    // Processar controles (teclado ou touch)
-    if (isMobile) {
-        // Controles de toque para mobile
-        if (touchControls.left) {
-            robo.setVelocityX(-150);
-            robo.setFlipX(true);
-        } else if (touchControls.right) {
-            robo.setVelocityX(150);
-            robo.setFlipX(false);
-        }
-        
-        if (touchControls.up) {
-            robo.setVelocityY(-150);
-            fogo.setVisible(true);
-        } else {
-            fogo.setVisible(false);
-            if (!robo.body.touching.down) {
-                robo.setVelocityY(150); // Faz o robô cair caso não esteja em uma plataforma
-            }
-        }
+    // Movimentação do robô
+    if (teclado.left.isDown) {
+        robo.setVelocityX(-150);
+        robo.setFlipX(true);
+    } else if (teclado.right.isDown) {
+        robo.setVelocityX(150);
+        robo.setFlipX(false);
+    }
+    
+    if (teclado.up.isDown) {
+        robo.setVelocityY(-150);
+        fogo.setVisible(true);
     } else {
-        // Controles de teclado para desktop
-        if (teclado.left.isDown) {
-            robo.setVelocityX(-150);
-            robo.setFlipX(true);
-        } else if (teclado.right.isDown) {
-            robo.setVelocityX(150);
-            robo.setFlipX(false);
-        }
-        
-        if (teclado.up.isDown) {
-            robo.setVelocityY(-150);
-            fogo.setVisible(true);
-        } else {
-            fogo.setVisible(false);
-            if (!robo.body.touching.down) {
-                robo.setVelocityY(150); // Faz o robô cair caso não esteja em uma plataforma
-            }
+        fogo.setVisible(false);
+        if (!robo.body.touching.down) {
+            robo.setVelocityY(150); // Faz o robô cair caso não esteja em uma plataforma
         }
     }
     
     // Ajustando a posição do efeito de fogo
     fogo.setPosition(robo.x, robo.y + robo.displayHeight / 2);
-    
+
     // Lógica específica para cada fase
     if (faseAtual === 1) {
         // Movimentação do Dino (indo e voltando infinitamente)
@@ -820,6 +558,7 @@ function update(time) {
                 dino.setVelocityX(100);
                 dino.setFlipX(false);
             }
+
             // Troca de direção do Dino ao atingir as bordas da plataforma
             if (dino.x <= larguraJogo / 5) {
                 dino.direction = 'right';
@@ -831,14 +570,13 @@ function update(time) {
         // Controlar os dinossauros da fase 2 (pulos e movimentos)
         fazerDinosPularem.call(this, time);
     }
-    
+
     // Verificando todos os barris
-    if (barrels) {
-        barrels.getChildren().forEach(barrel => {
-            if (barrel.y > alturaJogo) {
-                barrel.setPosition(Phaser.Math.Between(50, larguraJogo - 50), 0);
-            }
-        });
+    for (let i = 0; i < barrels.getChildren().length; i++) {
+        let barrel = barrels.getChildren()[i];
+        if (barrel.y > alturaJogo) {
+            barrel.setPosition(Phaser.Math.Between(50, larguraJogo - 50), 0);
+        }
     }
 }
 
@@ -864,11 +602,9 @@ function gameOver(robo, dino) {
     }
     
     // Parar os barris
-    if (barrels) {
-        barrels.getChildren().forEach(barrel => {
-            barrel.setVelocity(0);
-        });
-    }
+    barrels.getChildren().forEach(barrel => {
+        barrel.setVelocity(0);
+    });
     
     // Mostrar mensagem de Game Over
     const gameOverText = this.add.text(larguraJogo / 2, alturaJogo / 2 - 50, 'GAME OVER', {
@@ -910,11 +646,6 @@ function gameOver(robo, dino) {
     restartButton.on('pointerout', () => {
         restartButton.setFillStyle(0x3498db);
     });
-    
-    // Esconder os controles mobile após game over
-    if (isMobile) {
-        document.getElementById('mobile-controls').style.display = 'none';
-    }
 }
     </script>
 </body>
